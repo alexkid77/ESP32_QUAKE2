@@ -1,0 +1,15 @@
+# ESP-IDF
+build/
+managed_components/
+sdkconfig.old
+*.pyc
+
+# Sesiones / editor
+session-*.md
+*.swp
+
+# Logs de captura
+*.log
+
+# SD / capturas locales
+sdcard/

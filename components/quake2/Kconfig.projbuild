@@ -1,0 +1,12 @@
+menu "Quake II ESP32-P4"
+
+config QUAKE2_ESP32P4_DEBUG
+	bool "Debug printf output (FPS/MEM/audio)"
+	default n
+	help
+	  Enable verbose debug output from the port: periodic MEM stats
+	  (q_system.c), FPS/draw timing (display.c), audio task and PSRAM
+	  messages. When OFF (default), all that debug output is compiled
+	  out. See main/debug.h (Q2P4_DEBUG).
+
+endmenu
