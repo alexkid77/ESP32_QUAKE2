@@ -45,7 +45,7 @@ int QG_Milliseconds(void) { return (int)(esp_timer_get_time() / 1000); }
 
 
 
-#define QUAKE2_ESP32P4_FPS 0
+#define QUAKE2_ESP32P4_FPS 1
 
 #if QUAKE2_ESP32P4_FPS
 #define Q2P4_FPS_ARG "+set", "cg_drawfps", "1"
