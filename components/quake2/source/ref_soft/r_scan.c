@@ -372,7 +372,7 @@ D_DrawSpans16
   FIXME: actually make this subdivide by 16 instead of 8!!!
 =============
 */
-void D_DrawSpans16(espan_t *pspan) {
+/*void D_DrawSpans16(espan_t *pspan) {
   int count, spancount;
   unsigned char *pbase, *pdest;
   fixed16_t s, t, snext, tnext, sstep, tstep;
@@ -491,7 +491,129 @@ void D_DrawSpans16(espan_t *pspan) {
 
   } while ((pspan = pspan->pnext) != NULL);
 }
+*/
 
+void D_DrawSpans16(espan_t *pspan) {
+  int count, spancount;
+  unsigned char *pbase, *pdest;
+  fixed16_t s, t, snext, tnext, sstep, tstep;
+  float sdivz, tdivz, zi, z, du, dv, spancountminus1;
+  float sdivz16stepu, tdivz16stepu, zi16stepu;
+
+  sstep = 0;
+  tstep = 0;
+
+  pbase = (unsigned char *)cacheblock;
+
+  sdivz16stepu = d_sdivzstepu * 16;
+  tdivz16stepu = d_tdivzstepu * 16;
+  zi16stepu = d_zistepu * 16;
+
+  do {
+    pdest = (unsigned char *)((byte *)d_viewbuffer +
+                              (r_screenwidth * pspan->v) + pspan->u);
+
+    count = pspan->count;
+
+    du = (float)pspan->u;
+    dv = (float)pspan->v;
+
+    sdivz = d_sdivzorigin + dv * d_sdivzstepv + du * d_sdivzstepu;
+    tdivz = d_tdivzorigin + dv * d_tdivzstepv + du * d_tdivzstepu;
+    zi = d_ziorigin + dv * d_zistepv + du * d_zistepu;
+
+    z = (float)0x10000 / zi;
+
+    s = (int)(sdivz * z) + sadjust;
+
+    if (s > bbextents)
+      s = bbextents;
+    else if (s < 0)
+      s = 0;
+
+    t = (int)(tdivz * z) + tadjust;
+
+    if (t > bbextentt)
+      t = bbextentt;
+    else if (t < 0)
+      t = 0;
+
+    do {
+      if (count >= 16)
+        spancount = 16;
+      else
+        spancount = count;
+
+      count -= spancount;
+
+      if (count) {
+        sdivz += sdivz16stepu;
+        tdivz += tdivz16stepu;
+        zi += zi16stepu;
+
+        z = (float)0x10000 / zi;
+
+        snext = (int)(sdivz * z) + sadjust;
+
+        if (snext > bbextents)
+          snext = bbextents;
+        else if (snext < 8)
+          snext = 8;
+
+        tnext = (int)(tdivz * z) + tadjust;
+
+        if (tnext > bbextentt)
+          tnext = bbextentt;
+        else if (tnext < 8)
+          tnext = 8;
+
+        sstep = (snext - s) >> 4;
+        tstep = (tnext - t) >> 4;
+      } else {
+        spancountminus1 = (float)(spancount - 1);
+
+        sdivz += d_sdivzstepu * spancountminus1;
+        tdivz += d_tdivzstepu * spancountminus1;
+        zi += d_zistepu * spancountminus1;
+
+        z = (float)0x10000 / zi;
+
+        snext = (int)(sdivz * z) + sadjust;
+
+        if (snext > bbextents)
+          snext = bbextents;
+        else if (snext < 8)
+          snext = 8;
+
+        tnext = (int)(tdivz * z) + tadjust;
+
+        if (tnext > bbextentt)
+          tnext = bbextentt;
+        else if (tnext < 8)
+          tnext = 8;
+
+        if (spancount > 1) {
+          sstep = (snext - s) / (spancount - 1);
+          tstep = (tnext - t) / (spancount - 1);
+        }
+      }
+
+      do {
+        *pdest++ =
+            *(pbase + (s >> 16) + (t >> 16) * cachewidth);
+
+        s += sstep;
+        t += tstep;
+
+      } while (--spancount > 0);
+
+      s = snext;
+      t = tnext;
+
+    } while (count > 0);
+
+  } while ((pspan = pspan->pnext) != NULL);
+}
 #endif
 
 #if !id386
