@@ -493,7 +493,7 @@ D_DrawSpans16
 }
 */
 
-void D_DrawSpans16(espan_t *pspan) {
+/*void D_DrawSpans16(espan_t *pspan) {
   int count, spancount;
   unsigned char *pbase, *pdest;
   fixed16_t s, t, snext, tnext, sstep, tstep;
@@ -613,6 +613,151 @@ void D_DrawSpans16(espan_t *pspan) {
     } while (count > 0);
 
   } while ((pspan = pspan->pnext) != NULL);
+}*/
+static int          count, spancount;
+static byte         *pbase, *pdest;
+static fixed16_t    s, t, snext, tnext, sstep, tstep;
+static float        sdivz, tdivz, zi, z, du, dv, spancountminus1;
+static float        sdivzstepu, tdivzstepu, zistepu;
+static int		    izi, izistep; // mankrip
+static short		*pz; // mankrip
+#define WRITEPDEST(i) { pdest[i] = *(pbase + (s >> 16) + (t >> 16) * cachewidth); s+=sstep; t+=tstep;}
+
+void D_DrawSpans16(espan_t *pspan) //qb: up it from 8 to 16.  This + unroll = big speed gain!
+{
+	sstep = 0;   // keep compiler happy
+	tstep = 0;   // ditto
+
+	pbase = (byte *)cacheblock;
+	sdivzstepu = d_sdivzstepu * 16;
+	tdivzstepu = d_tdivzstepu * 16;
+	zistepu = d_zistepu * 16;
+
+	do
+	{
+		pdest = (byte *)((byte *)d_viewbuffer + (r_screenwidth * pspan->v) + pspan->u);
+		count = pspan->count >> 4;
+
+		spancount = pspan->count % 16;
+
+		// calculate the initial s/z, t/z, 1/z, s, and t and clamp
+		du = (float)pspan->u;
+		dv = (float)pspan->v;
+
+		sdivz = d_sdivzorigin + dv*d_sdivzstepv + du*d_sdivzstepu;
+		tdivz = d_tdivzorigin + dv*d_tdivzstepv + du*d_tdivzstepu;
+		zi = d_ziorigin + dv*d_zistepv + du*d_zistepu;
+		z = (float)0x10000 / zi;   // prescale to 16.16 fixed-point
+
+		s = (int)(sdivz * z) + sadjust;
+		if (s < 0) s = 0;
+		else if (s > bbextents) s = bbextents;
+
+		t = (int)(tdivz * z) + tadjust;
+		if (t < 0) t = 0;
+		else if (t > bbextentt) t = bbextentt;
+
+		while (count-- > 0) // Manoel Kasimier
+		{
+			sdivz += sdivzstepu;
+			tdivz += tdivzstepu;
+			zi += zistepu;
+			z = (float)0x10000 / zi;   // prescale to 16.16 fixed-point
+
+			snext = (int)(sdivz * z) + sadjust;
+			if (snext < 16) snext = 16;
+			else if (snext > bbextents) snext = bbextents;
+
+			tnext = (int)(tdivz * z) + tadjust;
+			if (tnext < 16) tnext = 16;
+			else if (tnext > bbextentt) tnext = bbextentt;
+
+			sstep = (snext - s) >> 4;
+			tstep = (tnext - t) >> 4;
+			pdest += 16;
+
+			WRITEPDEST(-16);
+			WRITEPDEST(-15);
+			WRITEPDEST(-14);
+			WRITEPDEST(-13);
+			WRITEPDEST(-12);
+			WRITEPDEST(-11);
+			WRITEPDEST(-10);
+			WRITEPDEST(-9);
+			WRITEPDEST(-8);
+			WRITEPDEST(-7);
+			WRITEPDEST(-6);
+			WRITEPDEST(-5);
+			WRITEPDEST(-4);
+			WRITEPDEST(-3);
+			WRITEPDEST(-2);
+			WRITEPDEST(-1);
+
+			s = snext;
+			t = tnext;
+		}
+		if (spancount > 0)
+		{
+			spancountminus1 = (float)(spancount - 1);
+			sdivz += d_sdivzstepu * spancountminus1;
+			tdivz += d_tdivzstepu * spancountminus1;
+			zi += d_zistepu * spancountminus1;
+			z = (float)0x10000 / zi;   // prescale to 16.16 fixed-point
+
+			snext = (int)(sdivz * z) + sadjust;
+			if (snext < 16) snext = 16;
+			else if (snext > bbextents) snext = bbextents;
+
+			tnext = (int)(tdivz * z) + tadjust;
+			if (tnext < 16) tnext = 16;
+			else if (tnext > bbextentt) tnext = bbextentt;
+
+			if (spancount > 1)
+			{
+				sstep = (snext - s) / (spancount - 1);
+				tstep = (tnext - t) / (spancount - 1);
+			}
+
+			pdest += spancount;
+
+			switch (spancount)
+			{
+			case 16:
+				WRITEPDEST(-16);
+			case 15:
+				WRITEPDEST(-15);
+			case 14:
+				WRITEPDEST(-14);
+			case 13:
+				WRITEPDEST(-13);
+			case 12:
+				WRITEPDEST(-12);
+			case 11:
+				WRITEPDEST(-11);
+			case 10:
+				WRITEPDEST(-10);
+			case  9:
+				WRITEPDEST(-9);
+			case  8:
+				WRITEPDEST(-8);
+			case  7:
+				WRITEPDEST(-7);
+			case  6:
+				WRITEPDEST(-6);
+			case  5:
+				WRITEPDEST(-5);
+			case  4:
+				WRITEPDEST(-4);
+			case  3:
+				WRITEPDEST(-3);
+			case  2:
+				WRITEPDEST(-2);
+			case  1:
+				WRITEPDEST(-1);
+				break;
+			}
+		}
+	} while ((pspan = pspan->pnext) != NULL);
 }
 #endif
 
