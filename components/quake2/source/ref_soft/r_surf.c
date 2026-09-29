@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "r_local.h"
 #include "../other/q_arena.h"
-
+#include "esp_attr.h"
 drawsurf_t	r_drawsurf;
 
 int				lightleft, sourcesstep, blocksize, sourcetstep;
@@ -171,7 +171,7 @@ void R_DrawSurface (void)
 R_DrawSurfaceBlock8_mip0
 ================
 */
-void R_DrawSurfaceBlock8_mip0 (void)
+/*void IRAM_ATTR R_DrawSurfaceBlock8_mip0 (void)
 {
 	int				v, i, b, lightstep, lighttemp, light;
 	unsigned char	pix, *psource, *prowdest;
@@ -221,7 +221,7 @@ void R_DrawSurfaceBlock8_mip0 (void)
 R_DrawSurfaceBlock8_mip1
 ================
 */
-void R_DrawSurfaceBlock8_mip1 (void)
+/*void IRAM_ATTR R_DrawSurfaceBlock8_mip1 (void)
 {
 	int				v, i, b, lightstep, lighttemp, light;
 	unsigned char	pix, *psource, *prowdest;
@@ -263,7 +263,7 @@ void R_DrawSurfaceBlock8_mip1 (void)
 		if (psource >= r_sourcemax)
 			psource -= r_stepback;
 	}
-}
+}*/
 
 
 /*
@@ -271,7 +271,7 @@ void R_DrawSurfaceBlock8_mip1 (void)
 R_DrawSurfaceBlock8_mip2
 ================
 */
-void R_DrawSurfaceBlock8_mip2 (void)
+/*void IRAM_ATTR R_DrawSurfaceBlock8_mip2 (void)
 {
 	int				v, i, b, lightstep, lighttemp, light;
 	unsigned char	pix, *psource, *prowdest;
@@ -313,7 +313,7 @@ void R_DrawSurfaceBlock8_mip2 (void)
 		if (psource >= r_sourcemax)
 			psource -= r_stepback;
 	}
-}
+}*/
 
 
 /*
@@ -321,7 +321,7 @@ void R_DrawSurfaceBlock8_mip2 (void)
 R_DrawSurfaceBlock8_mip3
 ================
 */
-void R_DrawSurfaceBlock8_mip3 (void)
+/*void IRAM_ATTR R_DrawSurfaceBlock8_mip3 (void)
 {
 	int				v, i, b, lightstep, lighttemp, light;
 	unsigned char	pix, *psource, *prowdest;
@@ -363,8 +363,70 @@ void R_DrawSurfaceBlock8_mip3 (void)
 		if (psource >= r_sourcemax)
 			psource -= r_stepback;
 	}
+}*/
+static inline __attribute__((always_inline))
+void DrawSurfaceBlock8_generic(const int SHIFT)
+{
+    const int N = 1 << SHIFT;                       // 16, 8, 4, 2
+    const unsigned char *colormap = (const unsigned char *)vid.colormap;
+    const int tstep     = sourcetstep;
+    const int rowbytes  = surfrowbytes;
+    const int lightw    = r_lightwidth;
+    const int numv      = r_numvblocks;
+    const int stepback  = r_stepback;
+    const unsigned char *smax = r_sourcemax;
+    const int *lightptr = r_lightptr;
+    const unsigned char * restrict psource = pbasesource;
+    unsigned char * restrict prowdest = prowdestbase;
+
+    for (int v = 0; v < numv; v++)
+    {
+        int lightleft  = lightptr[0];
+        int lightright = lightptr[1];
+        lightptr += lightw;
+        const int lleftstep  = (lightptr[0] - lightleft)  >> SHIFT;
+        const int lrightstep = (lightptr[1] - lightright) >> SHIFT;
+
+        for (int i = 0; i < N; i++)
+        {
+            const int lightstep = (lightleft - lightright) >> SHIFT;
+
+            if (N >= 4)
+            {
+                uint32_t *d32 = (uint32_t *)prowdest;
+                #pragma GCC unroll 4
+                for (int w = 0; w < N / 4; w++)
+                {
+                    const int b = w * 4;
+                  
+                    uint32_t p0 = colormap[((lightright + (N-1-(b+0))*lightstep) & 0xFF00) + psource[b+0]];
+                    uint32_t p1 = colormap[((lightright + (N-1-(b+1))*lightstep) & 0xFF00) + psource[b+1]];
+                    uint32_t p2 = colormap[((lightright + (N-1-(b+2))*lightstep) & 0xFF00) + psource[b+2]];
+                    uint32_t p3 = colormap[((lightright + (N-1-(b+3))*lightstep) & 0xFF00) + psource[b+3]];
+                    d32[w] = p0 | (p1 << 8) | (p2 << 16) | (p3 << 24);
+                }
+            }
+            else
+            {   
+                prowdest[0] = colormap[((lightright + lightstep) & 0xFF00) + psource[0]];
+                prowdest[1] = colormap[( lightright              & 0xFF00) + psource[1]];
+            }
+
+            psource    += tstep;
+            lightright += lrightstep;
+            lightleft  += lleftstep;
+            prowdest   += rowbytes;
+        }
+
+        if (psource >= smax)
+            psource -= stepback;
+    }
 }
 
+void IRAM_ATTR R_DrawSurfaceBlock8_mip0(void) { DrawSurfaceBlock8_generic(4); }
+void IRAM_ATTR R_DrawSurfaceBlock8_mip1(void) { DrawSurfaceBlock8_generic(3); }
+void IRAM_ATTR R_DrawSurfaceBlock8_mip2(void) { DrawSurfaceBlock8_generic(2); }
+void IRAM_ATTR R_DrawSurfaceBlock8_mip3(void) { DrawSurfaceBlock8_generic(1); }
 #endif
 
 

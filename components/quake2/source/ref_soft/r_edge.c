@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "r_local.h"
 #include "p4_memset.h"
-
+#include "esp_attr.h"
 #ifndef id386
 void R_SurfacePatch(void) {}
 
@@ -569,7 +569,7 @@ Output:
 Each surface has a linked list of its visible spans
 ==============
 */
-void R_ScanEdges(void) {
+void IRAM_ATTR R_ScanEdges(void) {
   int iv, bottom;
   byte basespans[MAXSPANS * sizeof(espan_t) + CACHE_SIZE];
   espan_t *basespan_p;
